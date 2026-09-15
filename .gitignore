@@ -1,0 +1,13 @@
+# Dependencies and builds
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Local secrets
+.env*.local
+
+# Editor and operating-system files
+.DS_Store
+*.log
+.freebuff/
