@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw, Upload, X } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
 import { PostPlatform } from '@/lib/types';
@@ -32,6 +32,11 @@ function CreatePostForm() {
   const [imageSource, setImageSource] = useState<string>('');
   const [imageStyle, setImageStyle] = useState<string>(IMAGE_STYLES[0]);
   const [imagePrompt, setImagePrompt] = useState<string>('');
+  const [photoMode, setPhotoMode] = useState<'generate' | 'upload'>('generate');
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [manualEditorOpen, setManualEditorOpen] = useState<boolean>(false);
 
   const brand = BRANDS[selectedBrand] || BRANDS.radya;
@@ -45,6 +50,13 @@ function CreatePostForm() {
         setBrief(existing.title);
         setCaption(existing.caption);
         setGeneratedImage(existing.mediaUrl || null);
+        if (existing.mediaUrl?.includes('/uploads/')) {
+          setPhotoMode('upload');
+          setImageSource('upload');
+        } else if (existing.mediaUrl) {
+          setPhotoMode('generate');
+          setImageSource('AI / existing');
+        }
         const parts = (existing.scheduledAt || '').split('T');
         if (parts[0]) setScheduledDate(parts[0]);
         if (parts[1]) setScheduledTime(parts[1].substring(0, 5));
@@ -110,13 +122,61 @@ function CreatePostForm() {
     }
   };
 
+  const handleUploadImage = async (file: File) => {
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      showToast('Format tidak didukung. Gunakan JPG, PNG, atau WebP.', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast(`Maksimal 5MB. File kamu ${(file.size / 1024 / 1024).toFixed(1)}MB.`, 'error');
+      return;
+    }
+    // Preview lokal instan sambil upload berjalan
+    if (localPreview) URL.revokeObjectURL(localPreview);
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPreview(previewUrl);
+    setIsUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('brandSlug', selectedBrand);
+      const res = await fetch('/api/upload-image', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Upload gagal');
+      setGeneratedImage(data.imageUrl || null);
+      setImageSource(`upload · ${data.fileName || file.name}`);
+      showToast('Foto diupload & disimpan ke Supabase Storage ✓', 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Upload gagal', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setGeneratedImage(null);
+    setImageSource('');
+    if (localPreview) {
+      URL.revokeObjectURL(localPreview);
+      setLocalPreview(null);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  useEffect(() => {
+    return () => {
+      if (localPreview) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
+
   const handleCopyCaption = () => {
     navigator.clipboard.writeText(caption).then(() => showToast('Caption copied!', 'success')).catch(() => showToast('Caption copied!', 'success'));
   };
 
   const handleDownloadImage = async () => {
     if (!generatedImage) {
-      showToast('Generate foto dulu.', 'warning');
+      showToast('Generate atau upload foto dulu.', 'warning');
       return;
     }
     try {
@@ -266,35 +326,127 @@ function CreatePostForm() {
             )}
           </div>
 
-          {/* PHOTO AI — FITUR BARU REAL */}
+          {/* PHOTO — GENERATE AI / UPLOAD */}
           <div className="border border-[#43D3A4]/35 rounded-[14px] p-4 bg-gradient-to-br from-[#43D3A4]/8 to-transparent">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-[#43D3A4] to-[#1793E8] text-[#051021] font-extrabold text-[10.5px] uppercase tracking-wider px-2.5 py-0.5 rounded-full">
-                <ImageIcon className="w-3 h-3" /> AI Photo Generator
+                <ImageIcon className="w-3 h-3" /> Foto / Visual
               </span>
               {imageSource && <span className="text-[11px] text-[var(--slate-300)]">source: {imageSource}</span>}
             </div>
-            <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder={`Prompt visual (kosongkan = pakai brief). cth: "modern Jakarta office team reviewing mission-critical dashboard, ${brand.name} vibe"`} className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-3 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#43D3A4] mb-2.5" />
-            <div className="flex gap-1.5 flex-wrap mb-3">
-              {IMAGE_STYLES.map((s) => (
-                <button key={s} type="button" onClick={() => setImageStyle(s)} className={`text-[11px] px-2.5 py-1 rounded-[5px] border transition-all ${imageStyle === s ? 'bg-[#43D3A4]/20 border-[#43D3A4] text-white font-bold' : 'bg-[var(--navy-raised)] border-[var(--navy-line)] text-[var(--slate-300)] hover:border-[#43D3A4]'}`}>
-                  {s}
-                </button>
-              ))}
+            {/* Tab switcher */}
+            <div className="grid grid-cols-2 gap-2 mb-3 p-1 rounded-[10px] bg-[var(--navy)] border border-[var(--navy-line)]">
+              <button
+                type="button"
+                onClick={() => setPhotoMode('generate')}
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-[7px] text-[12px] font-bold transition-all ${
+                  photoMode === 'generate' ? 'bg-[#1FA579] text-white' : 'text-[var(--slate-300)] hover:text-white'
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" /> Generate AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhotoMode('upload')}
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-[7px] text-[12px] font-bold transition-all ${
+                  photoMode === 'upload' ? 'bg-[#1793E8] text-white' : 'text-[var(--slate-300)] hover:text-white'
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" /> Upload Foto
+              </button>
             </div>
-            <button type="button" disabled={isGeneratingImage} onClick={handleGenerateImage} className="w-full bg-[#1FA579] hover:bg-[#43D3A4] hover:text-[#051021] disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-[8px] text-[13px] flex items-center justify-center gap-2 transition-all">
-              <ImageIcon className="w-4 h-4" /> {isGeneratingImage ? 'Generating photo (bisa 10–30 dtk)…' : 'Generate Photo with AI'}
-            </button>
+
+            {photoMode === 'generate' ? (
+              <>
+                <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder={`Prompt visual (kosongkan = pakai brief). cth: "modern Jakarta office team reviewing mission-critical dashboard, ${brand.name} vibe"`} className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-3 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#43D3A4] mb-2.5" />
+                <div className="flex gap-1.5 flex-wrap mb-3">
+                  {IMAGE_STYLES.map((s) => (
+                    <button key={s} type="button" onClick={() => setImageStyle(s)} className={`text-[11px] px-2.5 py-1 rounded-[5px] border transition-all ${imageStyle === s ? 'bg-[#43D3A4]/20 border-[#43D3A4] text-white font-bold' : 'bg-[var(--navy-raised)] border-[var(--navy-line)] text-[var(--slate-300)] hover:border-[#43D3A4]'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" disabled={isGeneratingImage} onClick={handleGenerateImage} className="w-full bg-[#1FA579] hover:bg-[#43D3A4] hover:text-[#051021] disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-[8px] text-[13px] flex items-center justify-center gap-2 transition-all">
+                  <ImageIcon className="w-4 h-4" /> {isGeneratingImage ? 'Generating photo (bisa 10–30 dtk)…' : 'Generate Photo with AI'}
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadImage(f);
+                  }}
+                />
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isUploading) fileInputRef.current?.click();
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f && !isUploading) handleUploadImage(f);
+                  }}
+                  className={`w-full rounded-[10px] border-2 border-dashed p-6 text-center cursor-pointer transition-all ${
+                    isDragging ? 'border-[#1793E8] bg-[#1793E8]/10' : 'border-[var(--navy-line)] bg-[var(--navy)] hover:border-[#1793E8]'
+                  } ${isUploading ? 'opacity-70 pointer-events-none' : ''}`}
+                >
+                  <Upload className="w-7 h-7 mx-auto mb-2 text-[#29B6F6]" />
+                  <p className="text-[13px] font-bold text-[var(--white)]">
+                    {isUploading ? 'Mengunggah ke Supabase Storage…' : 'Klik untuk pilih foto / drag & drop ke sini'}
+                  </p>
+                  <p className="text-[11.5px] text-[var(--slate-400)] mt-1">JPG, PNG, atau WebP · maksimal 5MB · tersimpan otomatis ke Supabase</p>
+                </div>
+                {localPreview && !generatedImage && (
+                  <div className="mt-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={localPreview} alt="Preview upload" className="w-full rounded-[10px] border border-[var(--navy-line)] object-cover max-h-[380px] opacity-70" />
+                    <p className="text-[11px] text-[var(--slate-400)] mt-1.5">Mengunggah… preview lokal, URL publik muncul setelah selesai.</p>
+                  </div>
+                )}
+              </>
+            )}
+
             {generatedImage && (
               <div className="mt-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={generatedImage} alt="AI generated" className="w-full rounded-[10px] border border-[var(--navy-line)] object-cover max-h-[380px]" />
-                <div className="flex justify-between items-center mt-2">
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={generatedImage} alt="Visual post" className="w-full rounded-[10px] border border-[var(--navy-line)] object-cover max-h-[380px]" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    title="Hapus foto"
+                    className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 hover:bg-black/90 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-[7px] transition-all"
+                  >
+                    <X className="w-3.5 h-3.5" /> Hapus
+                  </button>
+                </div>
+                <div className="flex justify-between items-center mt-2 flex-wrap gap-2">
                   <span className="text-[11px] text-[var(--slate-400)]">Foto ini akan tersimpan ke database (media_url) &amp; tampil di Kalender/Approval.</span>
                   <div className="flex gap-2">
-                    <button type="button" onClick={handleGenerateImage} className="flex items-center gap-1 text-[11px] font-bold text-[var(--slate-300)] hover:text-white">
-                      <RefreshCw className="w-3 h-3" /> Regenerate
-                    </button>
+                    {photoMode === 'generate' && (
+                      <button type="button" onClick={handleGenerateImage} className="flex items-center gap-1 text-[11px] font-bold text-[var(--slate-300)] hover:text-white">
+                        <RefreshCw className="w-3 h-3" /> Regenerate
+                      </button>
+                    )}
+                    {photoMode === 'upload' && (
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-[11px] font-bold text-[var(--slate-300)] hover:text-white">
+                        <Upload className="w-3 h-3" /> Ganti foto
+                      </button>
+                    )}
                     <button type="button" onClick={handleDownloadImage} className="flex items-center gap-1 text-[11px] font-bold text-[#43D3A4]">
                       <Download className="w-3 h-3" /> Download
                     </button>

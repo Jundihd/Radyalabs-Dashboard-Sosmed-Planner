@@ -1,15 +1,15 @@
 // NOTE: Dummy posts dihapus. Semua post bersifat REAL dari Supabase.
-// File ini hanya menyimpan metrics dummy yang memang diizinkan untuk Dashboard,
-// + helper mapping DB <-> Post type.
+// Dashboard memakai snapshot MANUAL Instagram Insights @radyalabs (bukan live API).
+// Lihat src/lib/radya-insights.ts untuk rincian audience & top content.
 
 import { Post, PerformanceMetrics } from '../types';
 
-// Dashboard boleh dummy — sisanya harus real.
+// Snapshot real IG @radyalabs 30 hari (18 Agu – 17 Sep): 628 followers, 13.266 views.
 export const INITIAL_METRICS: PerformanceMetrics = {
-  followers: '4,812',
-  posts: '9',
-  engagement: '3.1%',
-  reach: '24.5k',
+  followers: '628',
+  posts: '24',
+  engagement: '1.0%',
+  reach: '13,266',
 };
 
 // ---- DB row <-> Post mapping helpers (dipakai API route) ----
