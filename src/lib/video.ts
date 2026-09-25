@@ -37,6 +37,19 @@ export type VideoRequest = {
 
 const MODES = new Set<VideoMode>(['prompt', 'face', 'poster', 'video']);
 const SIZES = new Set(['720x1280', '1280x720', '1024x1024']);
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+
+export function validateReferenceFile(mode: VideoMode, mime: string, bytes: number): string | null {
+  if (mode === 'prompt') return 'Mode prompt tidak memerlukan media referensi.';
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'File referensi tidak valid.';
+  if (mode === 'video') {
+    if (!VIDEO_TYPES.has(mime)) return 'Gunakan video MP4, MOV, atau WebM.';
+    return bytes > 200 * 1024 * 1024 ? 'Ukuran video maksimal 200 MB.' : null;
+  }
+  if (!IMAGE_TYPES.has(mime)) return 'Gunakan gambar JPG, PNG, atau WebP.';
+  return bytes > 10 * 1024 * 1024 ? 'Ukuran gambar maksimal 10 MB.' : null;
+}
 
 export function validateVideoRequest(input: Partial<VideoRequest> | null | undefined): string | null {
   if (!input || !MODES.has(input.mode as VideoMode)) return 'Mode video tidak valid.';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildVideoPayload, validateVideoRequest } from './video.ts';
+import { buildVideoPayload, validateReferenceFile, validateVideoRequest } from './video.ts';
 
 const base = {
   model: 'wan-3.0-720p',
@@ -37,4 +37,12 @@ test('rejects missing media, consent, and unknown models', () => {
     /persetujuan/i,
   );
   assert.match(validateVideoRequest({ ...base, mode: 'prompt', model: 'unknown' }) ?? '', /model/i);
+});
+
+test('validates reference media type and size', () => {
+  assert.equal(validateReferenceFile('face', 'image/png', 1024), null);
+  assert.equal(validateReferenceFile('video', 'video/mp4', 1024), null);
+  assert.match(validateReferenceFile('video', 'image/png', 1024) ?? '', /video/i);
+  assert.match(validateReferenceFile('poster', 'image/png', 11 * 1024 * 1024) ?? '', /10 MB/i);
+  assert.match(validateReferenceFile('video', 'video/mp4', 201 * 1024 * 1024) ?? '', /200 MB/i);
 });
