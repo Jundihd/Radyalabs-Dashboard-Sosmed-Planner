@@ -69,8 +69,36 @@ export async function GET() {
   }
 
   const allOk = supabase.connected && storage.connected && gemini.connected;
+
+  // --- Provider video/image (ringan: GET /v1/models, key tidak pernah dibocorkan) ---
+  async function checkProvider(
+    label: string, baseEnv: string, keyEnv: string, fallbackBase: string
+  ): Promise<{ connected: boolean; detail: string }> {
+    const base = (process.env[baseEnv] || fallbackBase).replace(/\/$/, '');
+    const key = (process.env[keyEnv] || '').trim();
+    if (!key) return { connected: false, detail: `${keyEnv} belum diisi` };
+    try {
+      const res = await fetch(`${base}/v1/models`, {
+        headers: { Authorization: `Bearer ${key}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return { connected: false, detail: `${label}: provider menolak (${res.status}) — cek key` };
+      const data: any = await res.json().catch(() => ({}));
+      const count = Array.isArray(data?.data) ? data.data.length : 0;
+      return { connected: true, detail: `${label}: OK — ${base} (${count} model)` };
+    } catch (e: any) {
+      return { connected: false, detail: `${label}: tidak dapat dihubungi (${e?.message || 'timeout'})` };
+    }
+  }
+
+  const [video, image] = await Promise.all([
+    checkProvider('Video', 'NEW_API_BASE_URL', 'NEW_API_TOKEN', 'https://aotianzz.xyz'),
+    checkProvider('Image', 'IMAGE_API_BASE_URL', 'IMAGE_API_KEY', 'https://aotianzz.xyz'),
+  ]);
+
   return NextResponse.json(
-    { ok: allOk, supabase, storage, gemini, timestamp: new Date().toISOString() },
+    { ok: allOk, supabase, storage, gemini, video, image, timestamp: new Date().toISOString() },
     { status: allOk ? 200 : 503 }
   );
 }
