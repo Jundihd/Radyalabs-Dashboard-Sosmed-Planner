@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:video": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/lib/video.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.21.0",
