@@ -36,13 +36,13 @@ export default function RootLayout({
     <html lang="en" className={`${exo2.variable} ${raleway.variable}`}>
       <body>
         <AppProvider>
-          <div className="flex min-h-screen">
+          <div className="flex min-h-screen flex-col lg:flex-row">
             <Sidebar />
             <div className="flex-1 flex flex-col min-w-0">
-              <main className="flex-1 p-8 pb-16 overflow-y-auto">
+              <main className="flex-1 overflow-y-auto p-4 pb-12 sm:p-6 sm:pb-14 lg:p-8 lg:pb-16">
                 {children}
               </main>
-              <footer className="py-4 px-8 border-t border-[var(--navy-line)] text-[12px] text-[var(--slate-400)] flex items-center justify-between">
+              <footer className="flex items-center justify-between gap-3 border-t border-[var(--navy-line)] px-4 py-4 text-[10px] text-[var(--slate-400)] sm:px-8 sm:text-[12px]">
                 <span>Radya Labs Social Media System · v1 Planning &amp; Publishing Prototype</span>
                 <span>radya.id</span>
               </footer>

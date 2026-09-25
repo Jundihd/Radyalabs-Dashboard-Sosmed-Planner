@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildVideoPayload, validateReferenceFile, validateVideoRequest } from './video.ts';
+import {
+  buildVideoPayload,
+  isVideoFailureStatus,
+  isVideoPendingStatus,
+  isVideoSuccessStatus,
+  validateReferenceFile,
+  validateVideoRequest,
+} from './video.ts';
 
 const base = {
   model: 'wan-3.0-720p',
@@ -45,4 +52,16 @@ test('validates reference media type and size', () => {
   assert.match(validateReferenceFile('video', 'image/png', 1024) ?? '', /video/i);
   assert.match(validateReferenceFile('poster', 'image/png', 11 * 1024 * 1024) ?? '', /10 MB/i);
   assert.match(validateReferenceFile('video', 'video/mp4', 201 * 1024 * 1024) ?? '', /200 MB/i);
+});
+
+test('classifies provider task statuses without treating unknown states as complete', () => {
+  assert.equal(isVideoPendingStatus('queued'), true);
+  assert.equal(isVideoPendingStatus('processing'), true);
+  assert.equal(isVideoPendingStatus('archiving'), true);
+  assert.equal(isVideoSuccessStatus('completed'), true);
+  assert.equal(isVideoSuccessStatus('succeeded'), true);
+  assert.equal(isVideoFailureStatus('failed'), true);
+  assert.equal(isVideoFailureStatus('cancelled'), true);
+  assert.equal(isVideoSuccessStatus('archiving'), false);
+  assert.equal(isVideoFailureStatus('archiving'), false);
 });

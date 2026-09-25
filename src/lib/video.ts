@@ -35,6 +35,21 @@ export type VideoRequest = {
   enhancements?: Array<keyof typeof VIDEO_ENHANCEMENTS>;
 };
 
+const SUCCESS_STATUSES = new Set(['completed', 'success', 'succeeded']);
+const FAILURE_STATUSES = new Set(['failed', 'failure', 'cancelled', 'canceled']);
+
+export function isVideoSuccessStatus(status: string) {
+  return SUCCESS_STATUSES.has(status.toLowerCase());
+}
+
+export function isVideoFailureStatus(status: string) {
+  return FAILURE_STATUSES.has(status.toLowerCase());
+}
+
+export function isVideoPendingStatus(status: string) {
+  return !isVideoSuccessStatus(status) && !isVideoFailureStatus(status);
+}
+
 const MODES = new Set<VideoMode>(['prompt', 'face', 'poster', 'video']);
 const SIZES = new Set(['720x1280', '1280x720', '1024x1024']);
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
