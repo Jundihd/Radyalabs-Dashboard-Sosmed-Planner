@@ -33,6 +33,7 @@ import {
   type VideoMode,
   type VideoRequest,
 } from '@/lib/video';
+import { humanizeClientError } from '@/lib/provider-errors';
 
 const STORAGE_KEY = 'radya_video_task';
 const POLL_LIMIT = 60 * 60 * 1000;
@@ -144,7 +145,7 @@ export default function ContentVideoPage() {
       }
     } catch (error) {
       setPollDelay((current) => Math.min(current * 2, 60_000));
-      setPollError(error instanceof Error ? error.message : 'Status video gagal diperiksa.');
+      setPollError(humanizeClientError(error, 'video'));
     }
   }, [showToast]);
 
@@ -246,7 +247,7 @@ export default function ContentVideoPage() {
       setPollingStartedAt(Date.now());
       showToast('Task video dibuat. Proses biasanya memerlukan 10–25 menit.', 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Video gagal dibuat.', 'error');
+      showToast(humanizeClientError(error, 'video'), 'error');
     } finally {
       setIsGenerating(false);
     }

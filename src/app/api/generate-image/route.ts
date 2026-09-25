@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { BRANDS } from '@/lib/brands';
 import { DEFAULT_IMAGE_MODEL, orderedImageModels } from '@/lib/image-models';
+import { humanizeProviderError } from '@/lib/provider-errors';
 
 const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-3-pro-image', 'gemini-2.5-flash-image'];
 const BUCKET = 'social-media';
@@ -70,7 +71,12 @@ async function tryGatewayModel(baseUrl: string, apiKey: string, model: string, f
   }
   if (!res.ok) {
     const msg = data?.error?.message || data?.error || data?.message || `HTTP ${res.status}`;
-    throw new Error(`Model ${model} gagal: ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+    const friendly = humanizeProviderError({
+      status: res.status,
+      message: typeof msg === 'string' ? msg : JSON.stringify(msg),
+      action: 'image',
+    });
+    throw new Error(`Model ${model} gagal: ${friendly}`);
   }
   const item = data?.data?.[0];
   if (item?.b64_json) {
@@ -146,9 +152,15 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ error: `Foto AI gagal dibuat: ${errors[errors.length - 1] || 'semua model gagal.'}`, triedDetails: errors }, { status: 503 });
+    return NextResponse.json(
+      {
+        error: humanizeProviderError({ message: errors[errors.length - 1] || '', action: 'image' }),
+        triedDetails: errors,
+      },
+      { status: 503 }
+    );
   } catch (error: any) {
     console.error('Error generating image:', error);
-    return NextResponse.json({ error: error?.message || 'Failed to generate image' }, { status: 500 });
+    return NextResponse.json({ error: humanizeProviderError({ message: error?.message || '', action: 'image' }) }, { status: 500 });
   }
 }

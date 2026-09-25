@@ -6,6 +6,7 @@ import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image 
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
+import { humanizeClientError } from '@/lib/provider-errors';
 import { PostPlatform } from '@/lib/types';
 
 const IMAGE_STYLES = ['Photorealistic', 'Corporate illustration', 'Minimalist flat', 'Cinematic office', 'Tech abstract'];
@@ -126,7 +127,7 @@ function CreatePostForm() {
       setImageSource(data.source ? `${data.source}${data.model ? ` · ${data.model}` : ''}` : '');
       showToast('Foto AI dibuat dan disimpan ke Supabase Storage ✓', 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Image gagal', 'error');
+      showToast(humanizeClientError(err, 'image'), 'error');
     } finally {
       setIsGeneratingImage(false);
     }

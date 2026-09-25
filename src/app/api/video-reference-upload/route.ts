@@ -37,7 +37,11 @@ export async function POST(req: Request) {
   const supabase = createClient(url, key);
   const { data, error: uploadError } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
   if (uploadError || !data?.token) {
-    return NextResponse.json({ error: uploadError?.message || 'Token upload tidak dapat dibuat.' }, { status: 503 });
+    const detail = (uploadError?.message || '').toLowerCase();
+    const friendly = detail.includes('bucket') || detail.includes('not found')
+      ? 'Bucket penyimpanan Supabase tidak ditemukan. Minta admin menjalankan supabase/schema.sql lalu coba lagi.'
+      : 'Upload referensi gagal disiapkan. Periksa koneksi internet lalu coba lagi.';
+    return NextResponse.json({ error: friendly }, { status: 503 });
   }
   const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return NextResponse.json({ path, token: data.token, publicUrl: publicData.publicUrl });

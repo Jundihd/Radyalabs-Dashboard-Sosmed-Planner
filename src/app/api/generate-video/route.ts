@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { buildVideoPayload, validateVideoRequest, type VideoRequest } from '@/lib/video';
+import { humanizeProviderError } from '@/lib/provider-errors';
 
 export const maxDuration = 300;
 
@@ -35,9 +36,10 @@ async function providerFetch(path: string, init?: RequestInit) {
       data = { error: text || 'Respons provider tidak valid.' };
     }
     if (!response.ok) {
+      const status = response.status >= 400 && response.status < 600 ? response.status : 502;
       return NextResponse.json(
-        { error: messageFrom(data, `Provider video gagal (${response.status}).`) },
-        { status: response.status >= 400 && response.status < 600 ? response.status : 502 },
+        { error: humanizeProviderError({ status, message: messageFrom(data, ''), action: 'video' }) },
+        { status },
       );
     }
     return NextResponse.json({
@@ -49,10 +51,16 @@ async function providerFetch(path: string, init?: RequestInit) {
       error: data.error?.message || data.fail_reason,
     });
   } catch (error) {
-    const message = error instanceof Error && error.name === 'TimeoutError'
-      ? 'Provider video melewati batas waktu. Jika task sudah dibuat, lanjutkan pengecekan memakai task ID.'
-      : 'Provider video tidak dapat dihubungi.';
-    return NextResponse.json({ error: message }, { status: 503 });
+    const timedOut = error instanceof Error && error.name === 'TimeoutError';
+    return NextResponse.json(
+      {
+        error: humanizeProviderError({
+          message: timedOut ? 'timeout' : 'fetch failed',
+          action: 'video',
+        }),
+      },
+      { status: 503 }
+    );
   }
 }
 
