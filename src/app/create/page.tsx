@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw, Upload, X } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
+import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
 import { PostPlatform } from '@/lib/types';
 
 const IMAGE_STYLES = ['Photorealistic', 'Corporate illustration', 'Minimalist flat', 'Cinematic office', 'Tech abstract'];
@@ -32,6 +33,7 @@ function CreatePostForm() {
   const [imageSource, setImageSource] = useState<string>('');
   const [imageStyle, setImageStyle] = useState<string>(IMAGE_STYLES[0]);
   const [imagePrompt, setImagePrompt] = useState<string>('');
+  const [imageModel, setImageModel] = useState<string>(DEFAULT_IMAGE_MODEL);
   const [photoMode, setPhotoMode] = useState<'generate' | 'upload'>('generate');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -98,7 +100,8 @@ function CreatePostForm() {
   };
 
   const handleGenerateImage = async () => {
-    const prompt = imagePrompt.trim() || brief.trim();
+    const visual = imagePrompt.trim();
+    const prompt = visual || brief.trim();
     if (!prompt) {
       showToast('Isi brief atau prompt visual dulu.', 'warning');
       return;
@@ -108,7 +111,14 @@ function CreatePostForm() {
       const res = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, brandSlug: selectedBrand, style: imageStyle }),
+        // Caption final ikut sebagai konteks tematik bila prompt visual dikosongkan.
+        body: JSON.stringify({
+          prompt,
+          caption: !visual ? caption.trim().slice(0, 800) : '',
+          brandSlug: selectedBrand,
+          style: imageStyle,
+          model: imageModel,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Image gagal');
@@ -358,7 +368,22 @@ function CreatePostForm() {
 
             {photoMode === 'generate' ? (
               <>
-                <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder={`Prompt visual (kosongkan = pakai brief). cth: "modern Jakarta office team reviewing mission-critical dashboard, ${brand.name} vibe"`} className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-3 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#43D3A4] mb-2.5" />
+                <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder={`Prompt visual (kosongkan = pakai brief + caption final sebagai konteks). cth: "modern Jakarta office team reviewing mission-critical dashboard, ${brand.name} vibe"`} className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-3 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#43D3A4] mb-2.5" />
+                <div className="mb-2.5">
+                  <label className="block text-[11px] font-bold text-[var(--slate-300)] uppercase tracking-wider mb-1.5">
+                    Model · default {DEFAULT_IMAGE_MODEL}
+                  </label>
+                  <select
+                    value={imageModel}
+                    onChange={(e) => setImageModel(e.target.value)}
+                    className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-2.5 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#43D3A4]"
+                  >
+                    {IMAGE_MODEL_OPTIONS.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-[var(--slate-400)] mt-1">Bila model utama gagal / token habis, sistem otomatis coba model lain berurutan.</p>
+                </div>
                 <div className="flex gap-1.5 flex-wrap mb-3">
                   {IMAGE_STYLES.map((s) => (
                     <button key={s} type="button" onClick={() => setImageStyle(s)} className={`text-[11px] px-2.5 py-1 rounded-[5px] border transition-all ${imageStyle === s ? 'bg-[#43D3A4]/20 border-[#43D3A4] text-white font-bold' : 'bg-[var(--navy-raised)] border-[var(--navy-line)] text-[var(--slate-300)] hover:border-[#43D3A4]'}`}>
