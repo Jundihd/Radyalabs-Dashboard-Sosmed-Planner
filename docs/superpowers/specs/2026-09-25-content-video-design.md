@@ -95,6 +95,20 @@ The API token must never be returned to the browser, written into source code, o
 - Do not create a paid video generation task without separate confirmation because one Generate request can incur provider charges and may take 10–25 minutes or longer.
 - Deploy to the linked Vercel project, configure server environment variables, and smoke-test the deployed page without submitting a paid generation task.
 
+## Short Duration and Companion Caption Addendum
+
+- Replace the fixed duration with a selector limited to **5, 6, 7, or 8 seconds**; default to 5 seconds.
+- Enforce the same allowlist in server-side request validation so clients cannot submit a longer duration through the API route.
+- After a video task completes, show a caption panel below the video result with the prompt: **“Mau sekalian dibuatkan caption agar siap diposting?”**
+- Caption generation remains optional and runs only when the user clicks its button.
+- Reuse the existing `/api/generate-caption` endpoint and Gemini configuration; add no provider or dependency.
+- Build the caption brief from the original video prompt and selected creative preset. If the user supplies an additional caption direction, append it to that brief.
+- Let the user choose the existing Radya Labs brand profile and Instagram or LinkedIn before generation.
+- Display the returned caption in an editable textarea with a Copy action.
+- The economical version does not send the completed video file to Gemini or claim to analyze its pixels; the caption is derived from the prompt and creative direction that produced the video.
+- Persist the original prompt and preset with the latest local task so the caption panel still works after a page refresh.
+- Add regression checks for accepted durations, rejection outside 5–8 seconds, and caption-brief construction.
+
 ## Deliberate Exclusions
 
 - No multi-track editor, deterministic scene detection, automatic transcript generation, burned-in subtitles, or FFmpeg processing.
