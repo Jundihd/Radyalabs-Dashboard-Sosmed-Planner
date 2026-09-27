@@ -21,10 +21,13 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
+import { BRANDS } from '@/lib/brands';
 import {
+  VIDEO_DURATIONS,
   VIDEO_ENHANCEMENTS,
   VIDEO_MODELS,
   VIDEO_PRESETS,
+  buildVideoCaptionBrief,
   isVideoFailureStatus,
   isVideoPendingStatus,
   isVideoSuccessStatus,
@@ -73,6 +76,8 @@ type VideoTask = {
   url?: string;
   error?: string;
   createdAt: number;
+  prompt?: string;
+  preset?: keyof typeof VIDEO_PRESETS;
 };
 
 function ModeIcon({ mode }: { mode: VideoMode }) {
@@ -89,6 +94,7 @@ export default function ContentVideoPage() {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState<string>(VIDEO_MODELS[0]);
   const [size, setSize] = useState('720x1280');
+  const [seconds, setSeconds] = useState<string>(VIDEO_DURATIONS[0]);
   const [preset, setPreset] = useState<keyof typeof VIDEO_PRESETS>('talking_head');
   const [enhancements, setEnhancements] = useState<Array<keyof typeof VIDEO_ENHANCEMENTS>>(['hook', 'captions', 'centered']);
   const [file, setFile] = useState<File | null>(null);
@@ -99,6 +105,11 @@ export default function ContentVideoPage() {
   const [pollingStartedAt, setPollingStartedAt] = useState<number | null>(null);
   const [pollDelay, setPollDelay] = useState(7000);
   const [pollError, setPollError] = useState('');
+  const [captionBrand, setCaptionBrand] = useState('radya');
+  const [captionPlatform, setCaptionPlatform] = useState<'instagram' | 'linkedin'>('instagram');
+  const [captionDirection, setCaptionDirection] = useState('');
+  const [caption, setCaption] = useState('');
+  const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
 
   useEffect(() => {
     try {
@@ -190,7 +201,7 @@ export default function ContentVideoPage() {
   const handleGenerate = async () => {
     if (isGenerating) return;
     let referenceUrl: string | undefined;
-    const draft: VideoRequest = { mode, model, prompt, seconds: '5', size, preset, enhancements, faceConsent };
+    const draft: VideoRequest = { mode, model, prompt, seconds, size, preset, enhancements, faceConsent };
     if (mode !== 'prompt' && !file) {
       showToast('Pilih media referensi terlebih dahulu.', 'warning');
       return;
@@ -240,6 +251,8 @@ export default function ContentVideoPage() {
         progress: typeof data.progress === 'number' ? data.progress : 0,
         model: data.model || model,
         createdAt: Date.now(),
+        prompt: prompt.trim(),
+        preset,
       };
       setTask(nextTask);
       setPollError('');
@@ -258,6 +271,41 @@ export default function ContentVideoPage() {
     setTask(null);
     setPollingStartedAt(null);
     setPollError('');
+    setCaption('');
+    setCaptionDirection('');
+  };
+
+  const handleGenerateCaption = async () => {
+    if (!task?.prompt || !task.preset || isGeneratingCaption) return;
+    setIsGeneratingCaption(true);
+    try {
+      const response = await fetch('/api/generate-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brief: buildVideoCaptionBrief(task.prompt, task.preset, captionDirection),
+          brandSlug: captionBrand,
+          platform: captionPlatform,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Caption gagal dibuat.');
+      setCaption(data.caption || '');
+      showToast('Caption video berhasil dibuat.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Caption gagal dibuat.', 'error');
+    } finally {
+      setIsGeneratingCaption(false);
+    }
+  };
+
+  const copyCaption = async () => {
+    try {
+      await navigator.clipboard.writeText(caption);
+      showToast('Caption disalin.', 'success');
+    } catch {
+      showToast('Caption gagal disalin.', 'error');
+    }
   };
 
   const canGenerate = Boolean(
@@ -400,8 +448,8 @@ export default function ContentVideoPage() {
               </div>
               <div>
                 <label htmlFor="video-duration" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[var(--slate-300)]">Duration</label>
-                <select id="video-duration" value="5" disabled className="h-11 w-full rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--slate-300)] opacity-80">
-                  <option value="5">5 sec · model may override</option>
+                <select id="video-duration" value={seconds} onChange={(event) => setSeconds(event.target.value)} className="h-11 w-full rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
+                  {VIDEO_DURATIONS.map((value) => <option key={value} value={value}>{value} sec</option>)}
                 </select>
               </div>
             </div>
@@ -519,6 +567,41 @@ export default function ContentVideoPage() {
           )}
 
           <p className="mt-3 px-1 text-[10.5px] leading-5 text-[var(--slate-400)]">Media referensi harus dapat diakses provider selama proses. Jangan unggah materi rahasia.</p>
+
+          {task && isVideoSuccessStatus(task.status) && task.url ? (
+            <div className="mt-5 rounded-xl border border-[var(--navy-line)] bg-[var(--navy-deep)] p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#1FA579]/15 text-[#1FA579] dark:text-[#43D3A4]"><WandSparkles className="h-4 w-4" /></span>
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--white)]">Mau sekalian dibuatkan caption?</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--slate-400)]">Dibuat dari prompt dan gaya video agar hemat token.</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <select aria-label="Brand caption" value={captionBrand} onChange={(event) => setCaptionBrand(event.target.value)} className="h-10 rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
+                  {Object.values(BRANDS).map((brand) => <option key={brand.slug} value={brand.slug}>{brand.name}</option>)}
+                </select>
+                <select aria-label="Platform caption" value={captionPlatform} onChange={(event) => setCaptionPlatform(event.target.value as 'instagram' | 'linkedin')} className="h-10 rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
+                  <option value="instagram">Instagram</option>
+                  <option value="linkedin">LinkedIn</option>
+                </select>
+              </div>
+
+              <textarea value={captionDirection} onChange={(event) => setCaptionDirection(event.target.value)} rows={3} maxLength={500} placeholder="Opsional: santai, tambahkan CTA promo, target audiens..." className="mt-2 w-full resize-y rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] p-3 text-xs leading-5 text-[var(--white)] outline-none placeholder:text-[var(--slate-400)] focus:border-[#1FA579]" />
+              <button type="button" disabled={!task.prompt || !task.preset || isGeneratingCaption} onClick={handleGenerateCaption} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1FA579] px-3 text-xs font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40">
+                {isGeneratingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {isGeneratingCaption ? 'Membuat caption…' : 'Generate caption with AI'}
+              </button>
+
+              {caption ? (
+                <div className="mt-3">
+                  <textarea aria-label="Hasil caption" value={caption} onChange={(event) => setCaption(event.target.value)} rows={8} className="w-full resize-y rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] p-3 text-xs leading-5 text-[var(--white)] outline-none focus:border-[#1793E8]" />
+                  <button type="button" onClick={copyCaption} className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[var(--navy-line)] bg-[var(--navy-raised)] px-3 text-xs font-bold text-[var(--white)]"><Copy className="h-3.5 w-3.5" /> Copy caption</button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </aside>
       </div>
     </div>
