@@ -7,6 +7,8 @@ export const VIDEO_MODELS = [
   'mg-seedance-2.0-720p',
 ] as const;
 
+export const VIDEO_DURATIONS = ['5', '6', '7', '8'] as const;
+
 export const VIDEO_PRESETS = {
   talking_head: 'Vertical talking-head reel with a fast hook, natural presenter delivery, and energetic social pacing.',
   product_story: 'Product-story reel with clear visual progression, benefit-led scenes, and polished commercial lighting.',
@@ -34,6 +36,18 @@ export type VideoRequest = {
   preset?: keyof typeof VIDEO_PRESETS;
   enhancements?: Array<keyof typeof VIDEO_ENHANCEMENTS>;
 };
+
+export function buildVideoCaptionBrief(
+  prompt: string,
+  preset: keyof typeof VIDEO_PRESETS,
+  direction = '',
+) {
+  return [
+    `Konten video: ${prompt.trim()}`,
+    `Gaya video: ${VIDEO_PRESETS[preset]}`,
+    direction.trim() && `Arahan caption: ${direction.trim()}`,
+  ].filter(Boolean).join('\n');
+}
 
 const SUCCESS_STATUSES = new Set(['completed', 'success', 'succeeded']);
 const FAILURE_STATUSES = new Set(['failed', 'failure', 'cancelled', 'canceled']);
@@ -71,7 +85,9 @@ export function validateVideoRequest(input: Partial<VideoRequest> | null | undef
   if (!VIDEO_MODELS.includes(input.model as (typeof VIDEO_MODELS)[number])) return 'Model video tidak tersedia.';
   if (typeof input.prompt !== 'string' || !input.prompt.trim()) return 'Prompt video wajib diisi.';
   if (input.prompt.trim().length > 2000) return 'Prompt video maksimal 2.000 karakter.';
-  if (input.seconds !== '5') return 'Durasi yang didukung pada versi ini adalah 5 detik.';
+  if (!VIDEO_DURATIONS.includes(input.seconds as (typeof VIDEO_DURATIONS)[number])) {
+    return 'Durasi video harus 5–8 detik.';
+  }
   if (!input.size || !SIZES.has(input.size)) return 'Format video tidak valid.';
 
   if (input.mode !== 'prompt') {
