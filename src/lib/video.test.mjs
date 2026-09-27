@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  VIDEO_DURATIONS,
   buildVideoPayload,
+  buildVideoCaptionBrief,
   isVideoFailureStatus,
   isVideoPendingStatus,
   isVideoSuccessStatus,
@@ -64,4 +66,21 @@ test('classifies provider task statuses without treating unknown states as compl
   assert.equal(isVideoFailureStatus('cancelled'), true);
   assert.equal(isVideoSuccessStatus('archiving'), false);
   assert.equal(isVideoFailureStatus('archiving'), false);
+});
+
+test('accepts only 5–8 second videos', () => {
+  assert.deepEqual(VIDEO_DURATIONS, ['5', '6', '7', '8']);
+  for (const seconds of VIDEO_DURATIONS) {
+    assert.equal(validateVideoRequest({ ...base, mode: 'prompt', seconds }), null);
+  }
+  assert.match(validateVideoRequest({ ...base, mode: 'prompt', seconds: '4' }) ?? '', /5–8 detik/i);
+  assert.match(validateVideoRequest({ ...base, mode: 'prompt', seconds: '9' }) ?? '', /5–8 detik/i);
+});
+
+test('builds a caption brief from video direction and optional user guidance', () => {
+  assert.match(
+    buildVideoCaptionBrief('Demo produk', 'product_story', 'Tambahkan CTA'),
+    /Demo produk.*Product-story.*Tambahkan CTA/s,
+  );
+  assert.doesNotMatch(buildVideoCaptionBrief('Demo produk', 'product_story'), /Arahan caption:/);
 });
