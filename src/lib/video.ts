@@ -42,10 +42,12 @@ export function buildVideoCaptionBrief(
   preset: keyof typeof VIDEO_PRESETS,
   direction = '',
 ) {
+  const content = prompt.trim();
+  const captionDirection = direction.trim();
   return [
-    `Konten video: ${prompt.trim()}`,
+    content && `Konten video: ${content}`,
     `Gaya video: ${VIDEO_PRESETS[preset]}`,
-    direction.trim() && `Arahan caption: ${direction.trim()}`,
+    captionDirection && `Arahan caption: ${captionDirection}`,
   ].filter(Boolean).join('\n');
 }
 

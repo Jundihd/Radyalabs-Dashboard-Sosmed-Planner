@@ -84,3 +84,9 @@ test('builds a caption brief from video direction and optional user guidance', (
   );
   assert.doesNotMatch(buildVideoCaptionBrief('Demo produk', 'product_story'), /Arahan caption:/);
 });
+
+test('builds a caption brief from manual direction when no video prompt was saved', () => {
+  const brief = buildVideoCaptionBrief('', 'talking_head', 'Caption santai dengan CTA');
+  assert.doesNotMatch(brief, /Konten video:\s*$/m);
+  assert.match(brief, /talking-head.*Caption santai dengan CTA/is);
+});

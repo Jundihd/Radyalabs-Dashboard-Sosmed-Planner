@@ -90,6 +90,8 @@ function ModeIcon({ mode }: { mode: VideoMode }) {
 export default function ContentVideoPage() {
   const { showToast } = useApp();
   const inputRef = useRef<HTMLInputElement>(null);
+  const captionSectionRef = useRef<HTMLDivElement>(null);
+  const captionDirectionRef = useRef<HTMLTextAreaElement>(null);
   const [mode, setMode] = useState<VideoMode>('prompt');
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState<string>(VIDEO_MODELS[0]);
@@ -275,15 +277,24 @@ export default function ContentVideoPage() {
     setCaptionDirection('');
   };
 
-  const handleGenerateCaption = async () => {
-    if (!task?.prompt || !task.preset || isGeneratingCaption) return;
+  const handleGenerateCaption = async (
+    sourcePrompt = prompt,
+    sourcePreset: keyof typeof VIDEO_PRESETS = preset,
+  ): Promise<boolean> => {
+    if (isGeneratingCaption) return false;
+    if (!sourcePrompt.trim() && !captionDirection.trim()) {
+      captionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      captionDirectionRef.current?.focus();
+      showToast('Tulis prompt video atau arahan caption terlebih dahulu.', 'warning');
+      return false;
+    }
     setIsGeneratingCaption(true);
     try {
       const response = await fetch('/api/generate-caption', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brief: buildVideoCaptionBrief(task.prompt, task.preset, captionDirection),
+          brief: buildVideoCaptionBrief(sourcePrompt, sourcePreset, captionDirection),
           brandSlug: captionBrand,
           platform: captionPlatform,
         }),
@@ -292,8 +303,10 @@ export default function ContentVideoPage() {
       if (!response.ok) throw new Error(data?.error || 'Caption gagal dibuat.');
       setCaption(data.caption || '');
       showToast('Caption video berhasil dibuat.', 'success');
+      return true;
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Caption gagal dibuat.', 'error');
+      return false;
     } finally {
       setIsGeneratingCaption(false);
     }
@@ -313,6 +326,9 @@ export default function ContentVideoPage() {
     && (mode === 'prompt' || file)
     && (mode !== 'face' || faceConsent),
   );
+  const captionSourcePrompt = prompt.trim() || task?.prompt || '';
+  const captionSourcePreset = prompt.trim() ? preset : task?.preset || preset;
+  const canGenerateCaption = Boolean(captionSourcePrompt.trim() || captionDirection.trim());
   const isPending = Boolean(task && isVideoPendingStatus(task.status));
   const progress = Math.max(0, Math.min(100, task?.progress || 0));
 
@@ -489,6 +505,49 @@ export default function ContentVideoPage() {
               </button>
             </div>
           </div>
+
+          <div ref={captionSectionRef} className="scroll-mt-6 rounded-2xl border border-[var(--navy-line)] bg-[var(--navy-raised)] p-5 shadow-[var(--shadow-card)] sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1FA579]/15 text-[#1FA579] dark:text-[#43D3A4]"><WandSparkles className="h-5 w-5" /></span>
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#1FA579] dark:text-[#43D3A4]">03 · Caption</span>
+                <h2 className="mt-1 font-head text-lg font-bold text-[var(--white)]">Buat caption untuk video</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--slate-400)]">Bisa digunakan kapan saja dari prompt video atau arahan tambahan Anda.</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="caption-brand" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[var(--slate-300)]">Brand</label>
+                <select id="caption-brand" value={captionBrand} onChange={(event) => setCaptionBrand(event.target.value)} className="h-11 w-full rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
+                  {Object.values(BRANDS).map((brand) => <option key={brand.slug} value={brand.slug}>{brand.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="caption-platform" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[var(--slate-300)]">Platform</label>
+                <select id="caption-platform" value={captionPlatform} onChange={(event) => setCaptionPlatform(event.target.value as 'instagram' | 'linkedin')} className="h-11 w-full rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
+                  <option value="instagram">Instagram</option>
+                  <option value="linkedin">LinkedIn</option>
+                </select>
+              </div>
+            </div>
+
+            <label htmlFor="caption-direction" className="mb-1.5 mt-4 block text-[11px] font-bold uppercase tracking-wider text-[var(--slate-300)]">Arahan caption</label>
+            <textarea ref={captionDirectionRef} id="caption-direction" value={captionDirection} onChange={(event) => setCaptionDirection(event.target.value)} rows={3} maxLength={500} placeholder="Opsional: santai, tambahkan CTA promo, target audiens..." className="w-full resize-y rounded-xl border border-[var(--navy-line)] bg-[var(--navy)] p-3 text-sm leading-6 text-[var(--white)] outline-none placeholder:text-[var(--slate-400)] focus:border-[#1FA579]" />
+
+            <button type="button" disabled={!canGenerateCaption || isGeneratingCaption} onClick={() => void handleGenerateCaption(captionSourcePrompt, captionSourcePreset)} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1FA579] px-4 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40">
+              {isGeneratingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {isGeneratingCaption ? 'Membuat caption…' : 'Generate caption with AI'}
+            </button>
+
+            {caption ? (
+              <div className="mt-4 border-t border-[var(--navy-line)] pt-4">
+                <label htmlFor="caption-result" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[var(--slate-300)]">Hasil caption</label>
+                <textarea id="caption-result" value={caption} onChange={(event) => setCaption(event.target.value)} rows={8} className="w-full resize-y rounded-xl border border-[var(--navy-line)] bg-[var(--navy)] p-3 text-sm leading-6 text-[var(--white)] outline-none focus:border-[#1793E8]" />
+                <button type="button" onClick={copyCaption} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-bold text-[var(--white)]"><Copy className="h-3.5 w-3.5" /> Copy caption</button>
+              </div>
+            ) : null}
+          </div>
         </section>
 
         <aside className="h-fit rounded-2xl border border-[var(--navy-line)] bg-[var(--navy-raised)] p-4 shadow-[var(--shadow-card)] xl:sticky xl:top-6">
@@ -572,34 +631,18 @@ export default function ContentVideoPage() {
             <div className="mt-5 rounded-xl border border-[var(--navy-line)] bg-[var(--navy-deep)] p-4">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#1FA579]/15 text-[#1FA579] dark:text-[#43D3A4]"><WandSparkles className="h-4 w-4" /></span>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--white)]">Mau sekalian dibuatkan caption?</h3>
-                  <p className="mt-1 text-[11px] leading-5 text-[var(--slate-400)]">Dibuat dari prompt dan gaya video agar hemat token.</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-[var(--white)]">Ingin sekalian dibuatkan caption?</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--slate-400)]">AI akan memakai prompt dan gaya video ini agar hasilnya tetap relevan dan hemat token.</p>
                 </div>
               </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <select aria-label="Brand caption" value={captionBrand} onChange={(event) => setCaptionBrand(event.target.value)} className="h-10 rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
-                  {Object.values(BRANDS).map((brand) => <option key={brand.slug} value={brand.slug}>{brand.name}</option>)}
-                </select>
-                <select aria-label="Platform caption" value={captionPlatform} onChange={(event) => setCaptionPlatform(event.target.value as 'instagram' | 'linkedin')} className="h-10 rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] px-3 text-xs font-semibold text-[var(--white)] outline-none focus:border-[#1793E8]">
-                  <option value="instagram">Instagram</option>
-                  <option value="linkedin">LinkedIn</option>
-                </select>
-              </div>
-
-              <textarea value={captionDirection} onChange={(event) => setCaptionDirection(event.target.value)} rows={3} maxLength={500} placeholder="Opsional: santai, tambahkan CTA promo, target audiens..." className="mt-2 w-full resize-y rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] p-3 text-xs leading-5 text-[var(--white)] outline-none placeholder:text-[var(--slate-400)] focus:border-[#1FA579]" />
-              <button type="button" disabled={!task.prompt || !task.preset || isGeneratingCaption} onClick={handleGenerateCaption} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1FA579] px-3 text-xs font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40">
+              <button type="button" disabled={isGeneratingCaption} onClick={async () => {
+                const generated = await handleGenerateCaption(task.prompt || prompt, task.preset || preset);
+                if (generated) captionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1FA579] px-3 text-xs font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40">
                 {isGeneratingCaption ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {isGeneratingCaption ? 'Membuat caption…' : 'Generate caption with AI'}
+                {isGeneratingCaption ? 'Membuat caption…' : 'Buat caption sekarang'}
               </button>
-
-              {caption ? (
-                <div className="mt-3">
-                  <textarea aria-label="Hasil caption" value={caption} onChange={(event) => setCaption(event.target.value)} rows={8} className="w-full resize-y rounded-lg border border-[var(--navy-line)] bg-[var(--navy)] p-3 text-xs leading-5 text-[var(--white)] outline-none focus:border-[#1793E8]" />
-                  <button type="button" onClick={copyCaption} className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[var(--navy-line)] bg-[var(--navy-raised)] px-3 text-xs font-bold text-[var(--white)]"><Copy className="h-3.5 w-3.5" /> Copy caption</button>
-                </div>
-              ) : null}
             </div>
           ) : null}
         </aside>
