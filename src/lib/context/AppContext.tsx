@@ -18,6 +18,7 @@ interface AppContextType {
   setRole: (role: UserRole) => void;
   addPost: (post: Omit<Post, 'id' | 'createdAt'>) => Promise<Post | null>;
   updatePostStatus: (id: string, status: PostStatus, rejectionComment?: string | null, extra?: Partial<Post>) => Promise<Post | null>;
+  deletePost: (id: string) => Promise<boolean>;
   refreshPosts: () => Promise<void>;
   metrics: PerformanceMetrics;
   updateMetrics: (newMetrics: Partial<PerformanceMetrics>) => void;
@@ -158,6 +159,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deletePost = async (id: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/posts?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Gagal menghapus post');
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      if (selectedPost && selectedPost.id === id) setSelectedPost(null);
+      showToast('Post berhasil dihapus', 'success');
+      return true;
+    } catch (e: any) {
+      showToast(e?.message || 'Gagal menghapus post', 'error');
+      return false;
+    }
+  };
+
   const updateMetrics = (newMetrics: Partial<PerformanceMetrics>) => {
     const updated = { ...metrics, ...newMetrics, updatedAt: new Date().toISOString() };
     setMetrics(updated);
@@ -179,6 +195,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setRole,
         addPost,
         updatePostStatus,
+        deletePost,
         refreshPosts,
         metrics,
         updateMetrics,

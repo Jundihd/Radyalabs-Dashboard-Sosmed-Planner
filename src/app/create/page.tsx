@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw, Upload, X } from 'lucide-react';
+import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw, Upload, X, Edit3 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
@@ -17,6 +17,7 @@ function CreatePostForm() {
   const { addPost, showToast, posts, updatePostStatus } = useApp();
 
   const editId = searchParams.get('edit');
+  const editingPost = editId ? posts.find((p) => p.id === editId) : null;
   const dateParam = searchParams.get('date');
   const brandParam = searchParams.get('brand');
 
@@ -230,7 +231,8 @@ function CreatePostForm() {
         brandSlug: selectedBrand as any,
       });
       if (!updated) return;
-      showToast(status === 'pending_approval' ? 'Post resubmitted!' : 'Draft updated di Supabase!', 'success');
+      showToast(status === 'pending_approval' ? 'Post berhasil diajukan untuk Approval! ✓' : 'Draft berhasil diperbarui! ✓', 'success');
+      router.push('/approval');
     } else {
       const created = await addPost({
         brandSlug: selectedBrand as any,
@@ -244,13 +246,44 @@ function CreatePostForm() {
       });
       if (!created) return; // error toast sudah muncul
       showToast(status === 'pending_approval' ? 'Masuk Approval Queue ✓ (Supabase)' : 'Draft tersimpan ✓ (Supabase + muncul di Kalender)', 'success');
+      router.push(status === 'pending_approval' ? '/approval' : '/calendar');
     }
-    router.push(status === 'pending_approval' ? '/approval' : '/calendar');
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 max-w-7xl mx-auto">
       <div className="flex flex-col gap-5">
+        {editId && (
+          <div className="bg-[#1793E8]/10 border border-[#1793E8]/35 rounded-[14px] p-4 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className="text-[13px] font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-[#1793E8]" />
+                <span>Mode Edit: {editingPost?.title || 'Draft Post'}</span>
+                {editingPost && (
+                  <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded tracking-wider ${
+                    editingPost.status === 'draft' ? 'bg-slate-500/25 text-slate-300 border border-slate-500/40' :
+                    editingPost.status === 'pending_approval' ? 'bg-amber-500/20 text-amber-300' :
+                    editingPost.status === 'rejected' ? 'bg-rose-500/20 text-rose-300' :
+                    'bg-emerald-500/20 text-emerald-300'
+                  }`}>
+                    {editingPost.status.replace('_', ' ')}
+                  </span>
+                )}
+              </div>
+              <p className="text-[12px] text-[var(--slate-300)] mt-0.5">
+                Perbarui konten, caption, atau foto. Simpan perubahan sebagai draft atau ajukan untuk approval.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/approval')}
+              className="text-[12px] font-bold text-[var(--slate-300)] hover:text-white bg-[var(--navy)] border border-[var(--navy-line)] hover:border-[#1793E8] px-3 py-1.5 rounded-[6px] transition-all"
+            >
+              Kembali ke Antrean
+            </button>
+          </div>
+        )}
+
         <div className="bg-[var(--navy-raised)] border border-[var(--navy-line)] rounded-[16px] p-6 shadow-sm flex flex-col gap-5">
           <div>
             <label className="block text-[12.5px] font-bold text-[var(--white)] uppercase tracking-wider mb-2">
@@ -500,11 +533,21 @@ function CreatePostForm() {
             <input type="text" value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-2.5 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#1793E8]" />
           </div>
           <div className="flex items-center justify-between pt-4 border-t border-[var(--navy-line)] gap-3 flex-wrap">
-            <button type="button" onClick={() => handleSave('draft')} className="flex items-center gap-1.5 bg-[var(--navy)] border border-[var(--navy-line)] hover:border-[var(--slate-400)] text-[var(--slate-300)] hover:text-[var(--white)] px-4 py-2 rounded-[8px] text-[12.5px] font-semibold transition-all">
-              <Save className="w-3.5 h-3.5" /> Save as Draft (→ Kalender)
+            <button
+              type="button"
+              onClick={() => handleSave('draft')}
+              className="flex items-center gap-1.5 bg-[var(--navy)] border border-[var(--navy-line)] hover:border-[var(--slate-400)] text-[var(--slate-300)] hover:text-[var(--white)] px-4 py-2 rounded-[8px] text-[12.5px] font-semibold transition-all"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {editId ? 'Simpan Perubahan Draft' : 'Save as Draft (→ Kalender)'}
             </button>
-            <button type="button" onClick={() => handleSave('pending_approval')} className="flex items-center gap-1.5 bg-[#1793E8] hover:bg-[#29B6F6] text-white font-bold px-5 py-2 rounded-[8px] text-[13px] transition-all">
-              <Send className="w-4 h-4" /> Submit for Approval
+            <button
+              type="button"
+              onClick={() => handleSave('pending_approval')}
+              className="flex items-center gap-1.5 bg-[#1793E8] hover:bg-[#29B6F6] text-white font-bold px-5 py-2 rounded-[8px] text-[13px] shadow-sm transition-all"
+            >
+              <Send className="w-4 h-4" />
+              Submit for Approval
             </button>
           </div>
         </div>

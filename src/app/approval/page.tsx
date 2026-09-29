@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, AlertCircle, Copy, Download, Instagram, Linkedin, Eye, CheckCircle2 } from 'lucide-react';
+import { Check, AlertCircle, Copy, Download, Instagram, Linkedin, Eye, CheckCircle2, Edit3, Send, Clock } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
 import { PostStatus } from '@/lib/types';
@@ -11,15 +11,21 @@ import { PostStatus } from '@/lib/types';
 export default function ApprovalPage() {
   const router = useRouter();
   const { posts, updatePostStatus, openRejectModal, openPostDetail, showToast, role, loadingPosts, backendError, refreshPosts } = useApp();
-  const [filter, setFilter] = useState<'pending_approval' | 'approved' | 'all'>('pending_approval');
+  const [filter, setFilter] = useState<'pending_approval' | 'approved' | 'draft' | 'all'>('pending_approval');
 
   const pendingPosts = posts.filter((p) => p.status === 'pending_approval');
   const approvedPosts = posts.filter((p) => p.status === 'approved');
+  const draftPosts = posts.filter((p) => p.status === 'draft');
 
   const filteredPosts = posts.filter((p) => {
     if (filter === 'all') return true;
     return p.status === filter;
   });
+
+  const handleSubmitForApproval = async (id: string) => {
+    const updated = await updatePostStatus(id, 'pending_approval');
+    if (updated) showToast('Draft diajukan untuk Approval! Masuk ke antrean review.', 'success');
+  };
 
   const handleApprove = async (id: string) => {
     const updated = await updatePostStatus(id, 'approved');
@@ -91,6 +97,20 @@ export default function ApprovalPage() {
         </button>
 
         <button
+          onClick={() => setFilter('draft')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-[8px] text-[13px] font-bold transition-all ${
+            filter === 'draft'
+              ? 'bg-[#1793E8] text-white shadow-sm'
+              : 'bg-[var(--navy-raised)] border border-[var(--navy-line)] text-[var(--slate-300)] hover:text-[var(--white)]'
+          }`}
+        >
+          <span>Drafts</span>
+          <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10.5px]">
+            {draftPosts.length}
+          </span>
+        </button>
+
+        <button
           onClick={() => setFilter('all')}
           className={`flex items-center gap-2 px-4 py-2 rounded-[8px] text-[13px] font-bold transition-all ${
             filter === 'all'
@@ -121,10 +141,12 @@ export default function ApprovalPage() {
           <div className="bg-[var(--navy-raised)] border border-dashed border-[var(--navy-line)] rounded-[16px] p-12 text-center text-[var(--slate-400)] flex flex-col items-center justify-center">
             <CheckCircle2 className="w-10 h-10 text-[var(--teal)] mb-3" />
             <h3 className="font-head font-bold text-[16px] text-[var(--white)] mb-1">
-              No posts in this queue view
+              {filter === 'draft' ? 'Belum ada draft tersimpan' : 'No posts in this queue view'}
             </h3>
             <p className="text-[12.5px] max-w-sm mb-4">
-              All submitted posts have been reviewed or are in a different status.
+              {filter === 'draft'
+                ? 'Semua konten sudah disubmit ke antrean approval atau sudah tayang.'
+                : 'All submitted posts have been reviewed or are in a different status.'}
             </p>
             <Link
               href="/create"
@@ -176,7 +198,7 @@ export default function ApprovalPage() {
                       post.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
                       post.status === 'pending_approval' ? 'bg-amber-500/20 text-amber-400' :
                       post.status === 'rejected' ? 'bg-rose-500/20 text-rose-400' :
-                      'bg-slate-500/20 text-slate-400'
+                      'bg-slate-500/25 text-slate-300 border border-slate-500/40'
                     }`}>
                       {post.status.replace('_', ' ')}
                     </span>
@@ -192,6 +214,31 @@ export default function ApprovalPage() {
                   {post.rejectionComment && (
                     <div className="bg-rose-500/10 border-l-4 border-rose-500 p-2 text-[11.5px] text-rose-400 rounded-r-[4px]">
                       <strong>Rejection Reason:</strong> {post.rejectionComment}
+                    </div>
+                  )}
+
+                  {/* Draft Contextual Helper */}
+                  {post.status === 'draft' && (
+                    <div className="mt-1 bg-slate-500/10 border border-slate-500/25 rounded-[8px] p-2.5 flex items-center justify-between gap-3 flex-wrap">
+                      <span className="text-[11.5px] text-[var(--slate-300)] flex items-center gap-1.5 font-medium">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        Status Draft: Belum diajukan untuk approval ke pimpinan.
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => router.push(`/create?edit=${post.id}`)}
+                          className="text-[11.5px] font-bold text-[#1793E8] hover:underline flex items-center gap-1"
+                        >
+                          <Edit3 className="w-3 h-3" /> Edit Konten
+                        </button>
+                        <span className="text-slate-600">·</span>
+                        <button
+                          onClick={() => handleSubmitForApproval(post.id)}
+                          className="text-[11.5px] font-bold text-amber-400 hover:underline flex items-center gap-1"
+                        >
+                          <Send className="w-3 h-3" /> Submit for Approval
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -231,6 +278,27 @@ export default function ApprovalPage() {
 
                 {/* Queue Actions Column */}
                 <div className="flex sm:flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
+                  {post.status === 'draft' && (
+                    <>
+                      <button
+                        onClick={() => router.push(`/create?edit=${post.id}`)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-[#1793E8] hover:bg-[#29B6F6] text-white font-bold px-3 py-1.5 rounded-[8px] text-[11.5px] shadow-sm transition-all"
+                        title="Edit draft content, caption, or image"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        Edit Draft
+                      </button>
+                      <button
+                        onClick={() => handleSubmitForApproval(post.id)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 font-bold px-3 py-1.5 rounded-[8px] text-[11.5px] transition-all"
+                        title="Submit this draft to approver queue"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        Submit
+                      </button>
+                    </>
+                  )}
+
                   {post.status === 'pending_approval' && (
                     role === 'approver' ? (
                       <>
@@ -250,8 +318,17 @@ export default function ApprovalPage() {
                         </button>
                       </>
                     ) : (
-                      <div className="text-[11px] font-semibold text-[var(--slate-400)] bg-[var(--navy)] p-2 rounded text-center">
-                        Awaiting Approver
+                      <div className="flex flex-col gap-1.5">
+                        <div className="text-[11px] font-semibold text-[var(--slate-400)] bg-[var(--navy)] p-2 rounded text-center">
+                          Awaiting Approver
+                        </div>
+                        <button
+                          onClick={() => router.push(`/create?edit=${post.id}`)}
+                          className="flex items-center justify-center gap-1 text-[11px] font-semibold text-[var(--slate-300)] hover:text-white bg-[var(--navy-raised)] border border-[var(--navy-line)] hover:border-[#1793E8] p-1.5 rounded-[6px]"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          Edit Post
+                        </button>
                       </div>
                     )
                   )}
@@ -259,8 +336,9 @@ export default function ApprovalPage() {
                   {post.status === 'rejected' && (
                     <button
                       onClick={() => router.push(`/create?edit=${post.id}`)}
-                      className="flex-1 sm:flex-none bg-[#1793E8] text-white font-bold px-3 py-1.5 rounded-[8px] text-[11.5px]"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-[#1793E8] hover:bg-[#29B6F6] text-white font-bold px-3 py-1.5 rounded-[8px] text-[11.5px] shadow-sm transition-all"
                     >
+                      <Edit3 className="w-3.5 h-3.5" />
                       Edit Draft
                     </button>
                   )}
@@ -274,7 +352,7 @@ export default function ApprovalPage() {
 
                   <button
                     onClick={() => openPostDetail(post)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 text-[var(--slate-400)] hover:text-[var(--white)] text-[11px] font-semibold p-1"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 text-[var(--slate-400)] hover:text-[var(--white)] text-[11px] font-semibold p-1 transition-colors"
                   >
                     <Eye className="w-3 h-3" />
                     Inspect
