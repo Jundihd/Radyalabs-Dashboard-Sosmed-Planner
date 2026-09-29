@@ -262,7 +262,19 @@ export default function PostDetailModal() {
           </div>
         )}
 
-        <div className="flex justify-end pt-3 border-t border-[var(--navy-line)]">
+        <div className="flex items-center justify-between pt-3 border-t border-[var(--navy-line)]">
+          <button
+            onClick={async () => {
+              if (confirm('Yakin ingin menghapus postingan ini secara permanen?')) {
+                const ok = await deletePost(selectedPost.id);
+                if (ok) closePostDetail();
+              }
+            }}
+            className="text-rose-400 hover:text-rose-300 text-[12px] font-semibold flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] hover:bg-rose-500/10 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Hapus Postingan
+          </button>
           <button
             onClick={closePostDetail}
             className="bg-[var(--navy)] border border-[var(--navy-line)] text-[var(--slate-300)] hover:text-[var(--white)] px-4 py-2 rounded-[8px] text-[12.5px] font-semibold"

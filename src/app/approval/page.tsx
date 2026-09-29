@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, AlertCircle, Copy, Download, Instagram, Linkedin, Eye, CheckCircle2, Edit3, Send, Clock } from 'lucide-react';
+import { Check, AlertCircle, Copy, Download, Instagram, Linkedin, Eye, CheckCircle2, Edit3, Send, Clock, Trash2 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
 import { PostStatus } from '@/lib/types';
 
 export default function ApprovalPage() {
   const router = useRouter();
-  const { posts, updatePostStatus, openRejectModal, openPostDetail, showToast, role, loadingPosts, backendError, refreshPosts } = useApp();
+  const { posts, updatePostStatus, deletePost, openRejectModal, openPostDetail, showToast, role, loadingPosts, backendError, refreshPosts } = useApp();
   const [filter, setFilter] = useState<'pending_approval' | 'approved' | 'draft' | 'all'>('pending_approval');
 
   const pendingPosts = posts.filter((p) => p.status === 'pending_approval');
@@ -350,13 +350,27 @@ export default function ApprovalPage() {
                     </span>
                   )}
 
-                  <button
-                    onClick={() => openPostDetail(post)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 text-[var(--slate-400)] hover:text-[var(--white)] text-[11px] font-semibold p-1 transition-colors"
-                  >
-                    <Eye className="w-3 h-3" />
-                    Inspect
-                  </button>
+                  <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+                    <button
+                      onClick={() => openPostDetail(post)}
+                      className="flex-1 flex items-center justify-center gap-1 text-[var(--slate-400)] hover:text-[var(--white)] text-[11px] font-semibold p-1 transition-colors"
+                      title="Lihat detail postingan"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Inspect
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm(`Yakin ingin menghapus postingan "${post.title || 'Draft'}"?`)) {
+                          await deletePost(post.id);
+                        }
+                      }}
+                      className="flex items-center justify-center p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                      title="Hapus postingan"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

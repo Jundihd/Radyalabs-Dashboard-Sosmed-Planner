@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw, Upload, X, Edit3 } from 'lucide-react';
+import { Sparkles, Copy, Download, Send, Save, Instagram, Linkedin, Info, Image as ImageIcon, RefreshCw, Upload, X, Edit3, Trash2 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { BRANDS } from '@/lib/brands';
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_OPTIONS } from '@/lib/image-models';
@@ -14,7 +14,7 @@ const IMAGE_STYLES = ['Photorealistic', 'Corporate illustration', 'Minimalist fl
 function CreatePostForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { addPost, showToast, posts, updatePostStatus } = useApp();
+  const { addPost, deletePost, showToast, posts, updatePostStatus } = useApp();
 
   const editId = searchParams.get('edit');
   const editingPost = editId ? posts.find((p) => p.id === editId) : null;
@@ -533,22 +533,42 @@ function CreatePostForm() {
             <input type="text" value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="w-full bg-[var(--navy)] border border-[var(--navy-line)] rounded-[8px] p-2.5 text-[13px] text-[var(--white)] focus:outline-none focus:border-[#1793E8]" />
           </div>
           <div className="flex items-center justify-between pt-4 border-t border-[var(--navy-line)] gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleSave('draft')}
-              className="flex items-center gap-1.5 bg-[var(--navy)] border border-[var(--navy-line)] hover:border-[var(--slate-400)] text-[var(--slate-300)] hover:text-[var(--white)] px-4 py-2 rounded-[8px] text-[12.5px] font-semibold transition-all"
-            >
-              <Save className="w-3.5 h-3.5" />
-              {editId ? 'Simpan Perubahan Draft' : 'Save as Draft (→ Kalender)'}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSave('pending_approval')}
-              className="flex items-center gap-1.5 bg-[#1793E8] hover:bg-[#29B6F6] text-white font-bold px-5 py-2 rounded-[8px] text-[13px] shadow-sm transition-all"
-            >
-              <Send className="w-4 h-4" />
-              Submit for Approval
-            </button>
+            {editId ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('Yakin ingin menghapus postingan ini?')) {
+                    const ok = await deletePost(editId);
+                    if (ok) {
+                      router.push('/approval');
+                    }
+                  }
+                }}
+                className="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 px-3.5 py-2 rounded-[8px] text-[12.5px] font-semibold transition-all mr-auto"
+                title="Hapus Postingan Ini"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus Postingan
+              </button>
+            ) : null}
+            <div className={`flex items-center gap-3 ${!editId ? 'w-full justify-between' : 'ml-auto'}`}>
+              <button
+                type="button"
+                onClick={() => handleSave('draft')}
+                className="flex items-center gap-1.5 bg-[var(--navy)] border border-[var(--navy-line)] hover:border-[var(--slate-400)] text-[var(--slate-300)] hover:text-[var(--white)] px-4 py-2 rounded-[8px] text-[12.5px] font-semibold transition-all"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {editId ? 'Simpan Perubahan Draft' : 'Save as Draft (→ Kalender)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSave('pending_approval')}
+                className="flex items-center gap-1.5 bg-[#1793E8] hover:bg-[#29B6F6] text-white font-bold px-5 py-2 rounded-[8px] text-[13px] shadow-sm transition-all"
+              >
+                <Send className="w-4 h-4" />
+                Submit for Approval
+              </button>
+            </div>
           </div>
         </div>
       </div>
